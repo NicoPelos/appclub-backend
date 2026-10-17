@@ -1,0 +1,59 @@
+site_name: appClub — Manual de uso
+site_description: Manual de uso de appClub por rol, con el entorno demo para probar cada flujo.
+site_url: https://app.appclub.net.ar/demo/
+
+docs_dir: docs
+site_dir: ../public/demo
+
+theme:
+  name: material
+  language: es
+  icon:
+    logo: material/image-filter-hdr
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Cambiar a modo claro
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Cambiar a modo oscuro
+  features:
+    - navigation.tabs
+    - navigation.top
+    - navigation.instant
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Inicio: index.md
+  - Socio: socio.md
+  - Palestrero: palestrero.md
+  - Profesor: profesor.md
+  - Secretaría: secretaria.md
+  - Admin / Autoridad: admin.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg

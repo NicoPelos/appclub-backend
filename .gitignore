@@ -1,0 +1,41 @@
+# Node
+node_modules/
+dist/
+.env
+.env.local
+npm-debug.log
+*.log
+
+# Google credentials
+google-credentials.json
+client_secret*.json
+
+# Docker & Data
+data/
+mongo-data/
+uploads/
+
+# Binarios / APKs
+public/downloads/
+
+# Build de la PWA (se genera con `npx expo export -p web` en appCARC-mobile
+# y se copia acá — no es código fuente, se regenera en cada actualización)
+public/app/
+
+# Entorno virtual de Python del manual MkDocs (mkdocs-manual/) — se recrea con
+# `python3 -m venv .venv && pip install mkdocs-material`, no es código fuente.
+mkdocs-manual/.venv/
+
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Excels de trabajo (padrón, control de caja) y workspace local — no son código fuente
+*.xlsx
+*.code-workspace
+
+# Stryker (mutation testing, #263)
+.stryker-tmp/
+reports/mutation/

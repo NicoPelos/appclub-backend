@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # No se usa el bloque "services" porque necesita el flag --replSet en
+      # el comando de arranque, que ese bloque no permite pasar (solo
+      # expone "options" para flags de "docker run", no del entrypoint del
+      # contenedor) — ver testSetup.integration.js, que requiere un replica
+      # set real (mongoose.startSession/transacciones no funcionan en un
+      # mongod standalone).
+      - name: Levantar MongoDB con replica set rs0
+        run: |
+          docker run -d --name mongo -p 27017:27017 mongo:6.0 --replSet rs0 --bind_ip_all
+          for i in $(seq 1 30); do
+            docker exec mongo mongosh --quiet --eval "db.adminCommand('ping')" && break
+            sleep 1
+          done
+          docker exec mongo mongosh --quiet --eval "rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]})"
+
+      # Sin secretos de producción: testSetup.integration.js ya pisa
+      # GOOGLE_SHEETS_SOCIOS_ID/GOOGLE_SHEET_EXPORT_ID a vacío (sin eso, un
+      # test que crea un socio escribe filas de prueba en la planilla real
+      # del club) y define sus propios JWT_SECRET/FORMS_WEBHOOK_SECRET de
+      # test si no vienen seteados — no hace falta pasarle nada acá.
+      - run: npm run test:integration
+        env:
+          MONGO_URI: mongodb://localhost:27017/appcarc_test?replicaSet=rs0
+
+  # Qué IP de cliente le llega al backend por cada listener del gateway
+  # (80 = Tailscale Funnel, 81 = túnel de Cloudflare) — ver #302.
+  nginx-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: bash scripts/test-nginx-gateway.sh
