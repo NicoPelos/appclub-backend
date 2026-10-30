@@ -128,3 +128,72 @@ export const desvincularMercadopagoHandler = async (req, res) => {
     res.status(500).json({ message: 'Error al quitar el vínculo' });
   }
 };
+
+// Largo máximo razonable para un nombre leído de una captura o del
+// "Estado de cuenta" de MP (los nombres más largos vistos rondan los 50).
+const PAYER_NAME_MAX = 120;
+
+/**
+ * @openapi
+ * /api/movimientos/{id}/mercadopago-vinculo/{paymentId}:
+ *   patch:
+ *     summary: Completar o corregir el nombre del pagador de un vínculo con Mercado Pago ya existente
+ *     description: >
+ *       Solo actualiza `payerName` del vínculo — no toca monto, fecha, forma de
+ *       pago ni el resto del movimiento. Sirve para completar a posteriori el
+ *       nombre leído del reporte "Estado de cuenta" de MP (cuyo REFERENCE_ID es
+ *       el paymentId) en vínculos creados sin nombre, y así alimentar el
+ *       aprendizaje histórico por pagador (appcarc-backend#274).
+ *     tags: [Movimientos]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [payerName]
+ *             properties:
+ *               payerName: { type: string, maxLength: 120 }
+ *     responses:
+ *       200:
+ *         description: Nombre actualizado (o ya era ese)
+ *       400:
+ *         description: payerName vacío, no es texto o es demasiado largo
+ *       404:
+ *         description: Movimiento no encontrado, o no tiene ese vínculo
+ */
+export const actualizarPayerMercadopagoHandler = async (req, res) => {
+  try {
+    const { id, paymentId } = req.params;
+    const { payerName } = req.body ?? {};
+    if (typeof payerName !== 'string' || !payerName.trim()) {
+      return res.status(400).json({ message: 'Falta payerName' });
+    }
+    const nombre = payerName.trim();
+    if (nombre.length > PAYER_NAME_MAX) {
+      return res.status(400).json({ message: `payerName no puede superar ${PAYER_NAME_MAX} caracteres` });
+    }
+
+    const movimiento = await Movimiento.findOne({ _id: id, clubId: req.user?.clubId, active: true });
+    if (!movimiento) return res.status(404).json({ message: 'Movimiento no encontrado' });
+
+    const vinculo = movimiento.mercadopagoVinculos.find((v) => v.paymentId === String(paymentId));
+    if (!vinculo) return res.status(404).json({ message: 'Ese movimiento no tiene ese vínculo' });
+
+    // Idempotente: si ya tenía ese nombre no se guarda ni se audita nada.
+    if (vinculo.payerName === nombre) return res.json(movimiento);
+
+    const before = { paymentId: vinculo.paymentId, payerName: vinculo.payerName };
+    vinculo.payerName = nombre;
+    movimiento.updatedBy = getActor(req);
+    await movimiento.save();
+
+    logAudit({ clubId: req.user?.clubId, req, action: 'UPDATE', resource: 'Movimiento', resourceId: movimiento._id, before, after: { paymentId: vinculo.paymentId, payerName: nombre } });
+    res.json(movimiento);
+  } catch (error) {
+    console.error('Error actualizando el pagador del vínculo de Mercado Pago:', error);
+    res.status(500).json({ message: 'Error al actualizar el pagador' });
+  }
+};
